@@ -70,11 +70,17 @@ static int mksu_wrapper_iopoll(struct kiocb *kiocb, bool spin) {
 }
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 6, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 6, 0) && !(LINUX_VERSION_CODE < KERNEL_VERSION(3, 11, 0) && !defined(KSU_HAS_ITERATE_DIR))
 static int mksu_wrapper_iterate (struct file *fp, struct dir_context *dc) {
 	struct ksu_file_wrapper* data = fp->private_data;
 	struct file* orig = data->orig;
 	return orig->f_op->iterate(orig, dc);
+}
+#else // int (*readdir) (struct file *, void *, filldir_t);
+static int mksu_wrapper_readdir(struct file *fp, void *ptr, filldir_t filler) {
+	struct ksu_file_wrapper* data = fp->private_data;
+	struct file* orig = data->orig;
+	return orig->f_op->readdir(orig, ptr, filler);
 }
 #endif
 
@@ -261,7 +267,7 @@ static void mksu_wrapper_show_fdinfo(struct seq_file *m, struct file *f) {
 	}
 }
 
-#else
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(3, 8, 0)
 static int mksu_wrapper_show_fdinfo(struct seq_file *m, struct file *f) {
 	struct ksu_file_wrapper* data = m->file->private_data;
 	struct file* orig = data->orig;
@@ -335,9 +341,13 @@ struct ksu_file_wrapper* mksu_create_file_wrapper(struct file* fp) {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
 	p->ops.iopoll = fp->f_op->iopoll ? mksu_wrapper_iopoll : NULL;
 #endif
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 6, 0)
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 6, 0) && !(LINUX_VERSION_CODE < KERNEL_VERSION(3, 11, 0) && !defined(KSU_HAS_ITERATE_DIR))
 	p->ops.iterate = fp->f_op->iterate ? mksu_wrapper_iterate : NULL;
+#else
+	p->ops.readdir = fp->f_op->readdir ? mksu_wrapper_readdir : NULL;
 #endif
+
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 7, 0)
 	p->ops.iterate_shared = fp->f_op->iterate_shared ? mksu_wrapper_iterate_shared : NULL;
 #endif
@@ -366,7 +376,9 @@ struct ksu_file_wrapper* mksu_create_file_wrapper(struct file* fp) {
 	p->ops.splice_read = fp->f_op->splice_read ? mksu_wrapper_splice_read : NULL;
 	p->ops.setlease = fp->f_op->setlease ? mksu_wrapper_setlease : NULL;
 	p->ops.fallocate = fp->f_op->fallocate ? mksu_wrapper_fallocate : NULL;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 8, 0)
 	p->ops.show_fdinfo = fp->f_op->show_fdinfo ? mksu_wrapper_show_fdinfo : NULL;
+#endif
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 7, 0)
 	p->ops.copy_file_range = fp->f_op->copy_file_range ? mksu_wrapper_copy_file_range : NULL;
 #endif
