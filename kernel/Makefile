@@ -74,11 +74,4 @@ ccflags-y += -DEXPECTED_HASH=\"$(KSU_EXPECTED_HASH)\"
 ccflags-y += -Wno-strict-prototypes -Wno-int-conversion -Wno-gcc-compat -Wno-missing-prototypes
 ccflags-y += -Wno-declaration-after-statement -Wno-unused-function
 
-all:
-	make -C $(KDIR) M=$(MDIR) modules
-compdb:
-	python3 $(MDIR)/.vscode/generate_compdb.py -O $(KDIR) $(MDIR)
-clean:
-	make -C $(KDIR) M=$(MDIR) clean
-
 # Keep a new line here!! Because someone may append config
